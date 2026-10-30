@@ -7,7 +7,8 @@ from app.extraction.extractor import extraire_profil_cv
 import os
 from app.interview.engine import generer_plan_entretien
 load_dotenv(dotenv_path="../.env")
-
+from app.interview.session import InterviewSession
+from pydantic import BaseModel
 app = FastAPI(title="Landy API", version="0.1.0")
 
 app.add_middleware(
@@ -72,3 +73,60 @@ def test_plan_entretien():
         return {"status": "success", "plan": plan}
     except Exception as e:
         return {"error": str(e)}
+
+
+class UserResponse(BaseModel):
+    reponse: str
+
+
+# Variable globale temporaire (on utilisera une base de données plus tard)
+current_session = None
+
+
+@app.post("/interview/start")
+def start_interview():
+    global current_session
+    try:
+        # 1. Lecture du CV et extraction
+        pdf_path = "../data/test_cv.pdf"
+        texte_brut = parse_pdf(pdf_path)
+        profil_json = extraire_profil_cv(texte_brut)
+
+        # 2. Génération des 5 questions
+        plan = generer_plan_entretien(profil_json)
+
+        # 3. Création de la session en mémoire
+        current_session = InterviewSession(plan)
+
+        return {
+            "status": "success",
+            "question_actuelle": current_session.get_current_question(),
+            "progression": f"1 / {len(current_session.questions)}"
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/interview/answer")
+def answer_interview(data: UserResponse):
+    global current_session
+    if not current_session:
+        return {"error": "Aucun entretien en cours. Appelle /interview/start d'abord."}
+
+    # 1. Enregistrer la réponse
+    current_session.add_user_response(data.reponse)
+
+    # 2. Vérifier si c'est terminé
+    if current_session.current_index >= len(current_session.questions):
+        return {
+            "status": "finished",
+            "message": "L'entretien est terminé !",
+            "history": current_session.history
+        }
+
+    # 3. Sinon, poser la question suivante
+    return {
+        "status": "success",
+        "question_actuelle": current_session.get_current_question(),
+        "progression": f"{current_session.current_index + 1} / {len(current_session.questions)}"
+    }
