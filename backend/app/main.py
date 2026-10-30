@@ -6,11 +6,12 @@ from app.parsing.pdf import parse_pdf
 from app.extraction.extractor import extraire_profil_cv
 import os
 from app.interview.engine import generer_plan_entretien
-load_dotenv(dotenv_path="../.env")
+from app.storage.db import init_db, SessionLocal, DBSession
 from app.interview.session import InterviewSession
 from pydantic import BaseModel
+load_dotenv(dotenv_path="../.env")
 app = FastAPI(title="Landy API", version="0.1.0")
-
+init_db()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -85,26 +86,37 @@ current_session = None
 
 @app.post("/interview/start")
 def start_interview():
-    global current_session
+    db = SessionLocal()
     try:
-        # 1. Lecture du CV et extraction
         pdf_path = "../data/test_cv.pdf"
         texte_brut = parse_pdf(pdf_path)
         profil_json = extraire_profil_cv(texte_brut)
-
-        # 2. Génération des 5 questions
         plan = generer_plan_entretien(profil_json)
 
-        # 3. Création de la session en mémoire
+        # 1. Création de la session en base
+        db_session = DBSession(
+            plan_json=plan,
+            history_json=[],
+            current_index=0
+        )
+        db.add(db_session)
+        db.commit()
+        db.refresh(db_session)
+
+        # 2. On garde aussi la session en mémoire pour la suite
+        global current_session
         current_session = InterviewSession(plan)
 
         return {
             "status": "success",
+            "session_id": db_session.id,  # <-- NOUVEAU : L'ID de la session en base
             "question_actuelle": current_session.get_current_question(),
             "progression": f"1 / {len(current_session.questions)}"
         }
     except Exception as e:
         return {"error": str(e)}
+    finally:
+        db.close()
 
 
 @app.post("/interview/answer")
