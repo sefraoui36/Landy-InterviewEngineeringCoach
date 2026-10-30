@@ -1,0 +1,32 @@
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/600.css';
+
+:root {
+  /* Mode Clair (Light) d'après ta charte */
+  --bg: #F3F3F3;
+  --surface: #FFFFFF;
+  --text-main: #131313;
+  --text-muted: #858585;
+  --accent: #BED66F;
+  --accent-hover: #9DBB59;
+  --border: #E5E5E5;
+}
+
+/* Mode Sombre (Dark) d'après ta charte */
+[data-theme='dark'] {
+  --bg: #131313;
+  --surface: #3C3C3C;
+  --text-main: #F3F3F3;
+  --text-muted: #646464;
+  --accent: #5F8633;
+  --accent-hover: #446C24;
+  --border: #444444;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg);
+  color: var(--text-main);
+  transition: background-color 0.3s, color 0.3s;
+}
